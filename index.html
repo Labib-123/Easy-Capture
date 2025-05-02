@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Easy Capture</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+<body>
+    <div class="main-wrapper">
+        <div class="glass-container">
+            <h1><i class="fas fa-video"></i> Easy Capture</h1>
+            <div class="button-group">
+                <div class="start-options">
+                    <button id="startBtn"><i class="fas fa-play"></i> Start Recording</button>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" id="micCheck"> Record Mic</label>
+                        <label><input type="checkbox" id="systemCheck"> Record System Audio</label>
+                    </div>
+                </div>
+                <button id="stopBtn" disabled><i class="fas fa-stop"></i> Stop</button>
+                <a id="downloadBtn" download="screen_recording.webm" disabled><i class="fas fa-download"></i> Download</a>
+            </div>
+            <video id="recordedVideo" controls muted></video>
+        </div>
+
+        <div class="faq-section glass-container">
+            <h2>FAQs</h2>
+            <div class="faq">
+                <h3>🖥️ Can this record my entire screen?</h3>
+                <p>Yes, you can record your entire screen or a specific window/tab using browser screen capture permission.</p>
+            </div>
+            <div class="faq">
+                <h3>🌐 Which browsers are supported?</h3>
+                <p>This works best in Firefox, Chrome, and Edge with proper permissions.</p>
+            </div>
+            <div class="faq">
+                <h3>💾 Where is the video saved?</h3>
+                <p>You can download the video after recording or let it upload to the server (if backend is connected).</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let recordedChunks = [];
+        let stream;
+
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const videoEl = document.getElementById('recordedVideo');
+        const micCheck = document.getElementById('micCheck');
+        const systemCheck = document.getElementById('systemCheck');
+
+        startBtn.onclick = async () => {
+            const audioConstraints = [];
+            if (micCheck.checked) {
+                audioConstraints.push({ audio: true });
+            }
+            if (systemCheck.checked) {
+                audioConstraints.push({ audio: { mediaSource: "system" } });
+            }
+
+            try {
+                stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { mediaSource: "screen" },
+                    audio: audioConstraints.length > 0 ? true : false,
+                });
+
+                if (audioConstraints.length > 0){
+                    const audioTracks = await navigator.mediaDevices.getUserMedia(
+                        audioConstraints.reduce((acc, curr) => ({...acc, ...curr}), {})
+                    );
+
+                    stream.addTrack(audioTracks.getAudioTracks()[0]);
+                }
+
+                recordedChunks = [];
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = e => {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
+                };
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: "video/webm" });
+                    const url = URL.createObjectURL(blob);
+                    videoEl.src = url;
+                    downloadBtn.href = url;
+                    downloadBtn.disabled = false;
+                    videoEl.muted = false;
+                };
+
+                mediaRecorder.start();
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+            } catch (error) {
+                console.error("Error accessing media devices.", error);
+                alert("Error accessing media devices. Please check permissions.");
+            }
+        };
+
+        stopBtn.onclick = () => {
+            if (mediaRecorder) {
+                mediaRecorder.stop();
+                stream.getTracks().forEach(track => track.stop());
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+            }
+        };
+    </script>
+</body>
+</html>
